@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Play vs GTO Bot</title>
+    <style>
+        body { background: #2c3e50; color: white; font-family: 'Segoe UI', sans-serif; text-align: center; overflow: hidden; }
+        
+        .table {
+            background: #27ae60;
+            width: 800px; height: 500px;
+            margin: 40px auto;
+            border-radius: 200px;
+            border: 15px solid #1e824c;
+            position: relative;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+        }
+
+        .card {
+            width: 60px; height: 90px;
+            background: white; color: black;
+            border-radius: 6px; display: inline-flex;
+            align-items: center; justify-content: center;
+            font-size: 24px; font-weight: bold;
+            margin: 0 5px; box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            border: 2px solid #ccc;
+        }
+        .card.red { color: #c0392b; }
+        .card.black { color: #2c3e50; }
+        .card-back { background: #b03a2e; border: 2px solid white; color: transparent; }
+
+        /* Positions */
+        .board { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; }
+        .hero-area { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); }
+        .villain-area { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); }
+
+        .chips-pot { position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.3); padding: 5px 15px; border-radius: 20px; font-size: 14px; }
+        .chips-hero { position: absolute; bottom: 130px; left: 50%; transform: translateX(-50%); font-weight: bold; }
+        .chips-villain { position: absolute; top: 130px; left: 50%; transform: translateX(-50%); font-weight: bold; }
+
+        .controls { position: absolute; bottom: -80px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; transition: bottom 0.3s; }
+        .controls.active { bottom: 20px; }
+        
+        button {
+            padding: 15px 30px; font-size: 18px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;
+            transition: transform 0.1s;
+        }
+        button:active { transform: scale(0.95); }
+        .btn-check { background: #f1c40f; color: #333; }
+        .btn-bet { background: #e74c3c; color: white; }
+        .btn-fold { background: #3498db; color: white; }
+        .btn-new { background: #fff; color: #333; position: absolute; bottom: 45%; left: 50%; transform: translate(-50%, 50%); display: none; z-index: 10; }
+
+        .log { position: absolute; top: 10px; right: 10px; width: 200px; height: 150px; background: rgba(0,0,0,0.5); font-size: 12px; text-align: left; padding: 10px; overflow-y: auto; pointer-events: none;}
+    </style>
+</head>
+<body>
+
+    <div class="table">
+        <div class="villain-area">
+            <div id="villain-card" class="card card-back"></div>
+            <div class="chips-villain">Bot</div>
+        </div>
+
+        <div class="chips-pot">Pot: <span id="pot-display">2.0</span></div>
+        
+        <div class="board" id="board-container"></div>
+
+        <div class="hero-area">
+            <div id="hero-card" class="card"></div>
+            <div class="chips-hero">You</div>
+        </div>
+        
+        <div id="controls" class="controls">
+            <button class="btn-fold" onclick="act('fold')">Fold</button>
+            <button class="btn-check" onclick="act('check_call')" id="btn-check-call">Check</button>
+            <button class="btn-bet" onclick="act('bet')" id="btn-bet">Bet 1.0</button>
+        </div>
+
+        <button id="btn-restart" class="btn-new" onclick="startHand()">Deal New Hand</button>
+    </div>
+
+    <div class="log" id="game-log"></div>
+
+<script>
+    let STRATEGY = null;
+    let CURRENT_BOARD = []; // Loaded from API
+    
+    // Setup Rank/Suit constants
+    const SUITS = ['s', 'h', 'd', 'c'];
+    const RANKS = ['2','3','4','5','6','7','8','9','T','J','Q','K','A'];
+
+    let gameState = {
+        heroCard: "",
+        villainCard: "",
+        pot: 2.0,
+        history: "",
+        userTurn: true,
+        gameOver: false
+    };
+
+    async function init() {
+        log("Connecting to Solver...");
+        try {
+            const res = await fetch('http://localhost:8000/solution');
+            STRATEGY = await res.json();
+            
+            // 1. Get Board from Server Response
+            CURRENT_BOARD = STRATEGY.board || ["Ks", "Th", "7s", "4d", "2s"];
+            
+            // 2. Render Board on Table
+            const boardDiv = document.getElementById('board-container');
+            boardDiv.innerHTML = '';
+            CURRENT_BOARD.forEach(card => {
+                // Helper to render a card div
+                boardDiv.appendChild(createCardDiv(card));
+            });
+
+            log("Brain Loaded! Board Updated.");
+            startHand();
+        } catch(e) {
+            log("Error connecting to main.py");
+            console.error(e);
+        }
+    }
+
+    function createCardDiv(cardStr) {
+        let div = document.createElement('div');
+        let suit = cardStr[1];
+        let rank = cardStr[0];
+        let color = (suit === 'h' || suit === 'd') ? 'red' : 'black';
+        let suitChar = {'s':'♠', 'h':'♥', 'd':'♦', 'c':'♣'}[suit];
+        div.className = `card ${color}`;
+        div.innerText = rank + suitChar;
+        return div;
+    }
+
+    function startHand() {
+        document.getElementById('btn-restart').style.display = 'none';
+        document.getElementById('villain-card').className = "card card-back";
+        document.getElementById('villain-card').innerText = "";
+        
+        // 1. Create Deck (Removing cards currently on board)
+        let deck = [];
+        for(let r of RANKS) {
+            for(let s of SUITS) {
+                let card = r+s;
+                if(!CURRENT_BOARD.includes(card)) deck.push(card);
+            }
+        }
+        
+        // 2. Deal
+        let rand1 = Math.floor(Math.random() * deck.length);
+        gameState.heroCard = deck[rand1];
+        deck.splice(rand1, 1);
+        
+        let rand2 = Math.floor(Math.random() * deck.length);
+        gameState.villainCard = deck[rand2];
+
+        // 3. UI Update
+        gameState.history = "";
+        gameState.pot = 2.0;
+        gameState.gameOver = false;
+        gameState.userTurn = true; 
+        
+        // Render Hero Card
+        let heroDiv = document.getElementById('hero-card');
+        let newCard = createCardDiv(gameState.heroCard);
+        heroDiv.className = newCard.className;
+        heroDiv.innerText = newCard.innerText;
+
+        updateUI();
+        log(`New Hand. You have ${gameState.heroCard}`);
+    }
+
+    function act(action) {
+        if(gameState.gameOver) return;
+        let moveChar = '';
+        if (action === 'fold') moveChar = 'f';
+        if (action === 'check_call') moveChar = 'c';
+        if (action === 'bet') moveChar = 'b';
+
+        gameState.history += moveChar;
+        log(`You: ${action.toUpperCase()}`);
+
+        if (checkTerminalState()) return;
+
+        gameState.userTurn = false;
+        updateUI();
+        setTimeout(botMove, 800);
+    }
+
+    function botMove() {
+        if(gameState.gameOver) return;
+        let nodeName = gameState.history; // "", "b", "c", etc.
+        
+        if (!STRATEGY[nodeName]) {
+            // Fallback for weird edge cases
+            gameState.history += "c";
+        } else {
+            let hands = STRATEGY[nodeName].hands;
+            let myStrat = hands[gameState.villainCard]; 
+            
+            // Roll dice
+            let roll = Math.random();
+            let actionIdx = (roll < myStrat[0]) ? 0 : 1;
+            let actions = STRATEGY[nodeName].actions; 
+            
+            // Map index 0/1 to history chars
+            let char = (actionIdx === 0) ? (nodeName.includes('b') ? 'f' : 'c') : (nodeName.includes('b') ? 'c' : 'b');
+            
+            gameState.history += char;
+            log(`Bot: ${char === 'b' ? 'BET' : (char === 'f' ? 'FOLD' : 'CHECK/CALL')}`);
+        }
+
+        checkTerminalState();
+        gameState.userTurn = true;
+        updateUI();
+    }
+
+    function checkTerminalState() {
+        let h = gameState.history;
+        if (h.endsWith('f')) {
+            endGame(h.length % 2 !== 0 ? "You Win!" : "Bot Wins");
+            return true;
+        }
+        if (h === "cc" || h === "bc" || h === "cbc") {
+            // Reveal Bot
+            let villDiv = document.getElementById('villain-card');
+            let reveal = createCardDiv(gameState.villainCard);
+            villDiv.className = reveal.className;
+            villDiv.innerText = reveal.innerText;
+            
+            let heroRank = getRankVal(gameState.heroCard);
+            let villRank = getRankVal(gameState.villainCard);
+            
+            if (heroRank > villRank) endGame("You Win! (Showdown)");
+            else if (heroRank < villRank) endGame("Bot Wins! (Showdown)");
+            else endGame("Chop Pot.");
+            return true;
+        }
+
+        let bets = (h.match(/b/g) || []).length;
+        gameState.pot = 2.0 + (bets * 1.0);
+        if (h === "bc" || h === "cbc") gameState.pot += 1.0; 
+        
+        return false;
+    }
+
+    function endGame(msg) {
+        gameState.gameOver = true;
+        log(`--- ${msg} ---`);
+        document.getElementById('btn-restart').style.display = 'block';
+    }
+
+    function updateUI() {
+        document.getElementById('pot-display').innerText = gameState.pot.toFixed(1);
+        const controls = document.getElementById('controls');
+        if (gameState.userTurn && !gameState.gameOver) {
+            controls.classList.add('active');
+            let h = gameState.history;
+            if (h.includes('b')) {
+                document.getElementById('btn-check-call').innerText = "Call";
+                document.getElementById('btn-bet').style.display = 'none';
+            } else {
+                document.getElementById('btn-check-call').innerText = "Check";
+                document.getElementById('btn-bet').style.display = 'inline-block';
+            }
+        } else {
+            controls.classList.remove('active');
+        }
+    }
+
+    function getRankVal(cardStr) {
+        return RANKS.indexOf(cardStr[0]);
+    }
+
+    function log(msg) {
+        let div = document.getElementById('game-log');
+        div.innerHTML += `<div>${msg}</div>`;
+        div.scrollTop = div.scrollHeight;
+    }
+
+    init();
+</script>
+</body>
+</html>
