@@ -6,16 +6,15 @@ This tool calculates **Game Theory Optimal (GTO)** strategies for No-Limit Texas
 
 ## Features
 
-* **⚡ Vectorized Engine:** Uses NumPy memory arrays to solve full 52-card deck scenarios at **~7,000 iterations/second** in pure Python (no C++ compilation required).
-* **🎯 Dynamic Solving:** Input any board texture (e.g., `"Ah Ks Qh Jh Th"`) to rebuild the game tree and re-solve on the fly.
-* **📊 Interactive Analysis:** A heatmap visualization (`index.html`) to study GTO ranges, bluffing frequencies, and value betting.
-* **🎮 Play vs Bot:** A real-time training mode (`play.html`) where you can play hands against the solution you just generated.
-* **✅ Correct Logic:** Properly handles card removal (blockers), pot odds, and polarized betting ranges.
+* **Vectorized Engine:** Uses NumPy memory arrays to solve full 52-card deck scenarios at **~7,000 iterations/second** in pure Python (no C++ compilation required).
+* **Dynamic Solving:** Input any board texture (e.g., `"Ah Ks Qh Jh Th"`) to rebuild the game tree and re-solve on the fly.
+* **Interactive Analysis:** A heatmap visualization (`index.html`) to study GTO ranges, bluffing frequencies, and value betting.
+* **Play vs Bot:** A real-time training mode (`play.html`) where you can play hands against the solution you just generated.
+* **Correct Logic:** Properly handles card removal (blockers), pot odds, and polarized betting ranges.
 
 ## Installation
 
-1.  **Install Python 3.8+**
-2.  **Install dependencies:**
+  **Install dependencies:**
     ```bash
     pip install -r requirements.txt
     ```
@@ -23,7 +22,6 @@ This tool calculates **Game Theory Optimal (GTO)** strategies for No-Limit Texas
 
 ## Quick Start
 
-### 1. Start the Solver Engine
 Run the backend server. This handles the heavy math and serves the API.
 ```bash
 python main.py
@@ -31,7 +29,7 @@ python main.py
 
 *You will see `Uvicorn running on http://0.0.0.0:8000`.*
 
-### 2. Analyze Strategies (The Lab)
+### Analyze Strategies (The Lab)
 
 Open **`index.html`** in your web browser.
 
@@ -39,7 +37,7 @@ Open **`index.html`** in your web browser.
 * **Click Solve:** The engine will retrain for that specific board.
 * **Study:** View the 13x4 grid to see exactly which hands to Bet (Red), Check/Call (Green), or Fold (Blue).
 
-### 3. Play Against the AI (The Arena)
+### Play Against the AI (The Arena)
 
 Open **`play.html`** in your web browser.
 
