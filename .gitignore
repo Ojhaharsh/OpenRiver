@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Project-specific (auto-generated directories)
+logs/
+strategy_cache/
+
+# Optional: Environment variables (if using .env file)
+.env
+.env.local
+
+# Optional: PyCharm
+.pycharm.cache/
+
+# Optional: pytest
+.pytest_cache/
+.coverage
+htmlcov/
