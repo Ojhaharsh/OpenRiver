@@ -1,8 +1,25 @@
 import numpy as np
 from treys import Card, Evaluator
+from src.utils.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 class RiverHoldemGame:
-    def __init__(self, board_cards_str=["Ks", "Th", "7s", "4d", "2s"]):
+    """
+    Represents a No-Limit Texas Hold'em River game state.
+    
+    This class initializes the game tree structure, hand constants, 
+    and pre-calculates payoff matrices for all possible hand matchups.
+    """
+    
+    def __init__(self, board_cards_str: list[str] = ["Ks", "Th", "7s", "4d", "2s"]) -> None:
+        """
+        Initialize the game with a specific board.
+        
+        Args:
+            board_cards_str: List of 5 card strings (e.g., ["As", "Ks", "Qs", "Js", "Ts"])
+        """
         # 1. Setup Constants
         self.SUITS = ['s', 'h', 'd', 'c']
         self.RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A']
@@ -23,12 +40,17 @@ class RiverHoldemGame:
             3: ["f", "c"]  # Fold, Call
         }
 
-    def get_payoff_matrix(self):
+    def get_payoff_matrix(self) -> np.ndarray:
         """
-        Pre-calculates the 52x52 matrix of who wins.
-        Returns: matrix where 1.0 = Row Wins, -1.0 = Row Loses
+        Pre-calculates the 52x52 matrix of hand strength comparisons.
+        
+        Returns: 
+            A 52x52 numpy array where element [i,j] is:
+            - 1.0 if hand i beats hand j
+            - -1.0 if hand i loses to hand j
+            - 0.0 if they tie
         """
-        print("Calculating Hand Strengths...")
+        logger.debug("Calculating Hand Strengths...")
         strengths = np.zeros(len(self.HANDS), dtype=np.int32)
         
         for i, hand_str in enumerate(self.HANDS):
@@ -48,8 +70,17 @@ class RiverHoldemGame:
         # 1 if Row > Col, -1 if Row < Col
         return np.sign(strengths[:, None] - strengths[None, :]).astype(np.float32)
 
-    def get_pot_size(self, node_idx, action_idx):
-        """Returns the pot size for a Showdown at this node"""
+    def get_pot_size(self, node_idx: int, action_idx: int) -> float:
+        """
+        Returns the pot size for a Showdown at a given node.
+        
+        Args:
+            node_idx: Game tree node index (0-3)
+            action_idx: Action index for that node
+            
+        Returns:
+            Pot size for this node-action pair
+        """
         # Logic: Ante=2.0. Bet=+1.0. Call matches bet.
         if node_idx == 1 and action_idx == 1: return 4.0 # Bet(1) + Call(1) + Pot(2)
         if node_idx == 2 and action_idx == 0: return 2.0 # Check + Check + Pot(2)
